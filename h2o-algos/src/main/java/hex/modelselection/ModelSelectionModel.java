@@ -288,11 +288,10 @@ public class ModelSelectionModel extends Model<ModelSelectionModel, ModelSelecti
             }
             extractCoeffs(bestModel, index);
         }
-        
+
         void extractCoeffs(GLMModel model, int index) {
             _coefficient_names[index] = model._output.coefficientNames().clone(); // all coefficients
             ArrayList<String> coeffNames = new ArrayList<>(Arrays.asList(model._output.coefficientNames()));
-            coeffNames.remove(coeffNames.size()-1); // remove intercept as it is not a predictor
             _best_model_predictors[index] = coeffNames.toArray(new String[0]); // without intercept
         }
 
@@ -300,15 +299,12 @@ public class ModelSelectionModel extends Model<ModelSelectionModel, ModelSelecti
          * Eliminate predictors with lowest z-value (z-score) magnitude as described in III of 
          * ModelSelectionTutorial.pdf in https://h2oai.atlassian.net/browse/PUBDEV-8428
          */
-        void extractPredictors4NextModel(GLMModel model, int index, List<String> predNames, List<Integer> predIndices) {
+        void extractPredictors4NextModel(GLMModel model, int index, List<String> predNames, List<Integer> predIndices,
+                                         List<String> numPredNames, List<String> catPredNames) {
             extractCoeffs(model, index);
             _best_model_ids[index] = model.getKey();
-            List<Double> zValList = Arrays.stream(model._output.zValues()).boxed().map(Math::abs).collect(Collectors.toList());
-            zValList.remove(zValList.size()-1);    // remove intercept terms
-            int minZInd = zValList.indexOf(zValList.stream().min(Double::compare).get());   // find min magnitude
-            String minZvalPred = _best_model_predictors[index][minZInd];
-            int predIndex = predNames.indexOf(minZvalPred);
-            predIndices.remove(predIndices.indexOf(predIndex));
+            int predIndex2Remove = findMinZValue(model, numPredNames, catPredNames, predNames);
+            predIndices.remove(predIndices.indexOf(predIndex2Remove));
             _z_values[index] = model._output.zValues().clone();
             _coef_p_values[index] = model._output.pValues().clone();
         }
