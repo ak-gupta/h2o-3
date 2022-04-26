@@ -2945,7 +2945,8 @@ def _get_leaderboard(
             leaderboard = h2o.H2OFrame(result)[["model_id"] + [m.lower()
                                                                for m in METRICS
                                                                if m.lower() in result] + ["algo"]]
-            leaderboard.set_name("pr_auc", "aucpr")
+            if "pr_auc" in leaderboard.names:
+                leaderboard.set_name("pr_auc", "aucpr")
             if row_index is not None:
                 preds = predictions[0]
                 for pr in predictions[1:]:
