@@ -38,11 +38,11 @@ def test_modelselection_backward_gaussian():
         pred_pvalue.append(round(model_backward._model_json["output"]["coef_p_values"][ind][predictor_removed_index], 4))
         counter += 1
         coefs = model_backward.coef(len(pred_large)) # check coefficients result correct length
-        assert len(coefs) == len(pred_large)+1, "Expected coef length: {0}, Actual: {1}".format(len(coefs), len(pred_large)+1)
+        assert len(coefs) == len(pred_large), "Expected coef length: {0}, Actual: {1}".format(len(coefs), len(pred_large))
     common_elimination = list(set(predictor_elimination_order) & set(pred_ele))
     assert len(common_elimination) == len(pred_ele)
 
-    pyunit_utils.equal_two_arrays(pred_pvalue, eliminated_p_values, tolerance=1e-6)
+    pyunit_utils.equal_two_arrays(pred_pvalue, eliminated_p_values, tolerance=1e-4)
     
 if __name__ == "__main__":
     pyunit_utils.standalone_test(test_modelselection_backward_gaussian)
