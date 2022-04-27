@@ -3187,6 +3187,54 @@ public abstract class GLMTask  {
     public void reduce(ComputeSETsk c){_sumsqe += c._sumsqe; _wsum += c._wsum;}
   }
 
+  /***
+   * This function will assist in the estimation of dispersion factors using maximum likelihood
+   */
+  public static class ComputeMLSETsk extends FrameTask2<ComputeMLSETsk> {
+    final double [] _betaNew;
+    double _sumlnyi;
+    double _sumlnui;
+    double _sumyiOverui;
+    double _wsum;
+
+    public ComputeMLSETsk(H2OCountedCompleter cmp, DataInfo dinfo, Key jobKey, double [] betaNew, GLMParameters parms) {
+      super(cmp, dinfo, jobKey);
+      _glmf = new GLMWeightsFun(parms);
+      _betaNew = betaNew;
+    }
+    
+    transient double _sparseOffsetNew = 0;
+    final GLMWeightsFun _glmf;
+    transient GLMWeights _glmw;
+    @Override public void chunkInit(){
+      if(_sparse) {
+        _sparseOffsetNew = GLM.sparseOffset(_betaNew, _dinfo);
+      }
+      _glmw = new GLMWeights();
+    }
+
+    @Override
+    protected void processRow(Row r) {
+      double z = r.response(0) - r.offset;  // response
+      if (z > 0) {
+        double w = r.weight;
+        double eta = _glmf._family.equals(Family.tweedie) ? r.innerProduct(_betaNew) + _sparseOffsetNew + r.offset
+                : r.innerProduct(_betaNew) + _sparseOffsetNew;
+        double xmu = _glmf.linkInv(eta); // ui
+        _sumlnyi += w * Math.log(z);
+        _sumlnui += w * Math.log(xmu);
+        _sumyiOverui += w * z / xmu;
+        _wsum += w;
+      }
+    }
+    @Override
+    public void reduce(ComputeMLSETsk c){
+      _sumlnyi += c._sumlnyi; 
+      _sumlnui += c._sumlnui;
+      _sumyiOverui += c._sumyiOverui;
+      _wsum += c._wsum;}
+  }
+
   static class GLMIncrementalGramTask extends MRTask<GLMIncrementalGramTask> {
     final int[] _newCols;
     final DataInfo _dinfo;

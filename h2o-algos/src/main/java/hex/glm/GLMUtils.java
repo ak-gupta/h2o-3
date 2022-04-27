@@ -14,11 +14,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.apache.commons.math3.special.Gamma.digamma;
+import static org.apache.commons.math3.special.Gamma.trigamma;
 import static water.fvec.Vec.T_NUM;
 import static water.fvec.Vec.T_STR;
 
 public class GLMUtils {
-
+  public static final double EPS = 1e-14;
+  
   /***
    * From the gamColnames, this method attempts to translate to the column indices in adaptFrame.
    * @param adaptFrame
@@ -280,5 +283,29 @@ public class GLMUtils {
       smoothval += calSmoothNess(beta[classInd], penaltyMatrix, gamColIndices);
     }
     return smoothval;
+  }
+
+  /***
+   * Estimate dispersion factor using maximum likelihood.  I followed section IV of the doc in 
+   * https://h2oai.atlassian.net/browse/PUBDEV-8683 . 
+   */
+  public static double estimateMLSE(GLMTask.ComputeMLSETsk mlCT, double seInit) {
+    double constantValue = mlCT._sumlnyi + mlCT._wsum - mlCT._sumlnui - mlCT._sumyiOverui;
+    while (true) {
+      double numerator = mlCT._wsum*(Math.log(seInit)-digamma(seInit))+constantValue; // equation 2 of doc
+      double denominator = mlCT._wsum*(1.0/seInit - trigamma(seInit));  // equation 3 of doc
+      double change = numerator/denominator;
+      if (denominator == 0 || Double.isNaN(change))
+        return seInit;
+      if (Math.abs(change) < EPS)
+        return seInit-change;
+      else {
+        double se = seInit - change;
+        if (se < 0) // heuristc to prevent seInit <= 0
+          seInit *= 0.5;
+        else
+          seInit = se;
+      }
+    }
   }
 }
