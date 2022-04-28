@@ -300,10 +300,11 @@ public class ModelSelectionModel extends Model<ModelSelectionModel, ModelSelecti
          * ModelSelectionTutorial.pdf in https://h2oai.atlassian.net/browse/PUBDEV-8428
          */
         void extractPredictors4NextModel(GLMModel model, int index, List<String> predNames, List<Integer> predIndices,
-                                         List<String> numPredNames, List<String> catPredNames) {
+                                         List<String> numPredNames, List<String> catPredNames, Map<String, 
+                List<String>> cat2CoeffNames) {
             extractCoeffs(model, index);
             _best_model_ids[index] = model.getKey();
-            int predIndex2Remove = findMinZValue(model, numPredNames, catPredNames, predNames);
+            int predIndex2Remove = findMinZValue(model, numPredNames, catPredNames, cat2CoeffNames, predNames);
             predIndices.remove(predIndices.indexOf(predIndex2Remove));
             _z_values[index] = model._output.zValues().clone();
             _coef_p_values[index] = model._output.pValues().clone();

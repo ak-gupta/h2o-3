@@ -251,6 +251,7 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
             Frame train = DKV.getGet(_parms._train);
             List<String> numPredNames = coefNames.stream().filter(x -> train.vec(x).isNumeric()).collect(Collectors.toList());
             List<String> catPredNames = coefNames.stream().filter(x -> !numPredNames.contains(x)).collect(Collectors.toList());
+            Map<String, List<String>> catCatNames = addCat2CatCoeff(catPredNames, train);
             int numModelsBuilt = 0;
             String[] coefName = coefNames.toArray(new String[0]);
             for (int predNum = _numPredictors; predNum >= _parms._min_predictor_number; predNum--) {
@@ -265,7 +266,8 @@ public class ModelSelection extends ModelBuilder<hex.modelselection.ModelSelecti
 
                 // evaluate which variable to drop for next round of testing and store corresponding values
                 // if p_values_threshold is specified, model building may stop
-                model._output.extractPredictors4NextModel(glmModel, modelIndex, coefNames, coefIndice, numPredNames, catPredNames);
+                model._output.extractPredictors4NextModel(glmModel, modelIndex, coefNames, coefIndice, numPredNames, 
+                        catPredNames, catCatNames);
                 numModelsBuilt++;
                 DKV.remove(trainingFrame._key);
                 _job.update(predNum, "Finished building all models with "+predNum+" predictors.");

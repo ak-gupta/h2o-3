@@ -300,7 +300,7 @@ public class ModelSelectionUtils {
     }
     
     public static int findMinZValue(GLMModel model, List<String> numPredNames, List<String> catPredNames, 
-                                    List<String> predNames) {
+                                    Map<String, List<String>> catCoeffNames, List<String> predNames) {
         List<Double> zValList = Arrays.stream(model._output.zValues()).boxed().map(Math::abs).collect(Collectors.toList());
         List<String> coeffNames = Arrays.stream(model._output.coefficientNames()).collect(Collectors.toList());
         if (coeffNames.contains("Intercept")) { // remove intercept terms
@@ -310,7 +310,7 @@ public class ModelSelectionUtils {
         }
         // grab min z-values for numerical and categorical columns
         PredNameMinZVal numericalPred = findNumMinZVal(numPredNames, zValList, coeffNames);
-        PredNameMinZVal categoricalPred = findCatMinZVal(catPredNames, zValList, coeffNames);
+        PredNameMinZVal categoricalPred = findCatMinZVal(catPredNames, catCoeffNames, zValList, coeffNames);
         
         // choose the min z-value from numerical and categorical predictors and return its index in predNames
         if (categoricalPred._minZVal >= 0 && categoricalPred._minZVal < numericalPred._minZVal) { // categorical pred has minimum z-value
@@ -320,6 +320,18 @@ public class ModelSelectionUtils {
             numPredNames.remove(numPredNames.indexOf(numericalPred._predName));
             return predNames.indexOf(numericalPred._predName);
         }
+    }
+    
+    public static Map<String, List<String>> addCat2CatCoeff(List<String> catPredNames, Frame train) {
+        Map<String, List<String>> catCatCoeffNames = new HashMap<>();
+        for (String predName : catPredNames) {
+            String[] levelNames = train.vec(predName).domain();
+            List<String> coeffNames = new ArrayList<>();
+            for (String levelName : levelNames)
+                coeffNames.add(predName+"."+levelName);
+            catCatCoeffNames.put(predName, coeffNames);
+        }
+        return catCatCoeffNames;
     }
     
     public static PredNameMinZVal findNumMinZVal(List<String> numPredNames, List<Double> zValList, List<String> coeffNames) {
@@ -342,17 +354,25 @@ public class ModelSelectionUtils {
         }
         return new PredNameMinZVal(numPredMinZ, minNumVal);
     }
-    
-    public static PredNameMinZVal findCatMinZVal(List<String> catPredNames, List<Double> zValList, List<String> coeffNames) {
+
+    /***
+     * This method finds the z-value of a categorical column.  However, for categorical column, there are many levels
+     * and there will be coefficients for those levels.  Hence, there will be a z-value associated with those 
+     * coefficients.  In order to determine that the categorical predictor is to be removed, I will look for the 
+     * maximum of all abs(z-values) for that categorical predictor and return it.
+     */
+    public static PredNameMinZVal findCatMinZVal(List<String> catPredNames, Map<String, List<String>> catCoeffNames, 
+                                                 List<Double> zValList, List<String> coeffNames) {
         double minCatVal = -1;
         String catPredMinZ = null;
         if (catPredNames != null && catPredNames.size() > 0) {
             minCatVal = Double.MAX_VALUE;
-            for (String catName : catPredNames) {
+            for (String catName : catPredNames) {   // grab z-values for each cat predictor
                 List<Double> catZValues = new ArrayList<>();
-                for (String coeffName : coeffNames) {
-                    if (coeffName.startsWith(catName)) {
-                        int eleInd = coeffNames.indexOf(coeffName);
+                List<String> catCoefName = catCoeffNames.get(catName);
+                for (String coefName : catCoefName) {
+                    int eleInd = coeffNames.indexOf(coefName);
+                    if (eleInd >= 0) {
                         double oneZVal = zValList.get(eleInd);
                         if (Double.isNaN(oneZVal)) {
                             zValList.set(eleInd, 0.0);
