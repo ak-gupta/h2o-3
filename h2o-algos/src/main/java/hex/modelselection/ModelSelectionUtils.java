@@ -313,15 +313,7 @@ public class ModelSelectionUtils {
         PredNameMinZVal categoricalPred = findCatMinZVal(catPredNames, zValList, coeffNames);
         
         // choose the min z-value from numerical and categorical predictors and return its index in predNames
-        if (categoricalPred._minZVal >= 0 && numericalPred._minZVal >= 0) {
-            if (categoricalPred._minZVal < numericalPred._minZVal) {
-                catPredNames.remove(catPredNames.indexOf(categoricalPred._predName));
-                return predNames.indexOf(categoricalPred._predName);
-            } else {
-                numPredNames.remove(numPredNames.indexOf(numericalPred._predName));
-                return predNames.indexOf(numericalPred._predName);
-            }
-        } else if (categoricalPred._minZVal >= 0) { // categorical pred has minimum z-value
+        if (categoricalPred._minZVal >= 0 && categoricalPred._minZVal < numericalPred._minZVal) { // categorical pred has minimum z-value
             catPredNames.remove(catPredNames.indexOf(categoricalPred._predName));
             return predNames.indexOf(categoricalPred._predName);
         } else {    // numerical pred has minimum z-value
