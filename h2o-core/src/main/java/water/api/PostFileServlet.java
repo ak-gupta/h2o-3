@@ -31,7 +31,7 @@ public class PostFileServlet extends HttpServlet {
       // JSON Payload returned is:
       //     { "destination_frame": "key_name", "total_bytes": nnn }
       //
-      InputStream is = ServletUtils.extractPartInputStream(request, response);
+      InputStream is = request.getContentType() == null ? request.getInputStream() : ServletUtils.extractPartInputStream(request, response);
       if (is == null) {
         return;
       }
