@@ -1,5 +1,6 @@
 package hex.gam.MatrixFrameUtils;
 
+import com.google.gson.internal.Streams;
 import hex.Model;
 import hex.gam.GAM;
 import hex.gam.GAMModel;
@@ -18,6 +19,7 @@ import water.util.TwoDimTable;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static hex.gam.GamSplines.ThinPlateRegressionUtils.calculateM;
 import static hex.gam.GamSplines.ThinPlateRegressionUtils.calculatem;
@@ -36,6 +38,16 @@ public class GamUtils {
       }
     }
     return array3D;
+  }
+
+  public static void expandIgnoreColumns(GAMParameters parms, String foldColumn) {
+    if (parms._ignored_columns == null) {
+      parms._ignored_columns = new String[]{foldColumn};
+    } else {
+      List<String> ignoredCols = new ArrayList<>(Arrays.asList(parms._ignored_columns));
+      ignoredCols.add(foldColumn);
+      parms._ignored_columns = ignoredCols.toArray(new String[0]);
+    }
   }
 
   public static double[][][] allocate3DArray(int num2DArrays, GAMParameters parms, AllocateType fileMode) {

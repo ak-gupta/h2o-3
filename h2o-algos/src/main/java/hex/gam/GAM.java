@@ -57,6 +57,7 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
   public double[][] _oneOGamColStd;
   public double[] _penaltyScale;
   public int _glmNFolds = 0;
+  String[] _origIgnoredColumns = null;
   Model.Parameters.FoldAssignmentScheme _foldAssignment = null;
   String _foldColumn = null;
   boolean _cvOn = false;
@@ -191,6 +192,7 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
   
   @Override
   public void init(boolean expensive) {
+    _origIgnoredColumns = _parms._ignored_columns;
     if (_parms._nfolds > 0 || _parms._fold_column != null) {
       _cvOn = true;
       _glmNFolds = _parms._fold_column == null ? _parms._nfolds 
@@ -798,6 +800,9 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
       final IcedHashSet<Key<Frame>> validKeys = new IcedHashSet<>();
       try {
         _job.update(0, "Adding GAM columns to training dataset...");
+        if (_foldColumn != null)
+          expandIgnoreColumns(_parms, _foldColumn);
+        
         _dinfo = new DataInfo(_train.clone(), _valid, 1, _parms._use_all_factor_levels 
                 || _parms._lambda_search, _parms._standardize ? 
                 DataInfo.TransformType.STANDARDIZE : DataInfo.TransformType.NONE, DataInfo.TransformType.NONE,
@@ -900,10 +905,12 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
       if (_foldColumn == null) {
         glmParam._nfolds = _glmNFolds;
       } else {
-        glmParam._fold_column = _foldColumn;
         glmParam._nfolds = 0;
       }
+      glmParam._fold_column = _foldColumn;
       glmParam._fold_assignment = _foldAssignment;
+      if (_cvOn)
+        glmParam._ignored_columns = _origIgnoredColumns;
       return new GLM(glmParam, _penaltyMatCenter,  _gamColNamesCenter).trainModel().get();
     }
 
@@ -969,6 +976,7 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
       glmParam._valid = valid==null?null:valid._key;
       glmParam._nfolds = _glmNFolds; // will do cv in GLM and not in GAM
       glmParam._fold_assignment = _foldAssignment;
+      glmParam._fold_column = _foldColumn;
       return glmParam;
     }
   }
