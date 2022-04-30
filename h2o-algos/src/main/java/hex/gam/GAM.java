@@ -57,7 +57,6 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
   public double[][] _oneOGamColStd;
   public double[] _penaltyScale;
   public int _glmNFolds = 0;
-  String[] _origIgnoredColumns = null;
   Model.Parameters.FoldAssignmentScheme _foldAssignment = null;
   String _foldColumn = null;
   boolean _cvOn = false;
@@ -192,7 +191,6 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
   
   @Override
   public void init(boolean expensive) {
-    _origIgnoredColumns = _parms._ignored_columns;
     if (_parms._nfolds > 0 || _parms._fold_column != null) {
       _cvOn = true;
       _glmNFolds = _parms._fold_column == null ? _parms._nfolds 
@@ -469,7 +467,7 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
           _starT = GamUtils.allocate3DArrayTP(_thinPlateSmoothersWithKnotsNum, _parms, _parms._num_knots_tp, _parms._M);
       }
       addGAM2Train();  // add GAM columns to training frame
-      return buildGamFrame(_parms, _train, _gamFrameKeysCenter); // add gam cols to _train
+      return buildGamFrame(_parms, _train, _gamFrameKeysCenter, _foldColumn); // add gam cols to _train
     }
     
     // This class generate the thin plate regression smoothers as denoted in GamThinPlateRegressionH2O.pdf
@@ -800,17 +798,30 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
       final IcedHashSet<Key<Frame>> validKeys = new IcedHashSet<>();
       try {
         _job.update(0, "Adding GAM columns to training dataset...");
+/*        if (_foldColumn != null) {
+          Frame train = copyWithoutFold(_train, _foldColumn);
+          _dinfo = new DataInfo(train, _valid, 1, _parms._use_all_factor_levels
+                  || _parms._lambda_search, _parms._standardize ?
+                  DataInfo.TransformType.STANDARDIZE : DataInfo.TransformType.NONE, DataInfo.TransformType.NONE,
+                  _parms.missingValuesHandling() == GLMParameters.MissingValuesHandling.Skip,
+                  _parms.missingValuesHandling() == GLMParameters.MissingValuesHandling.MeanImputation
+                          || _parms.missingValuesHandling() == GLMParameters.MissingValuesHandling.PlugValues,
+                  _parms.makeImputer(), false, hasWeightCol(), hasOffsetCol(), hasFoldCol(),
+                  _parms.interactionSpec());
+        } else {*/
         if (_foldColumn != null)
-          expandIgnoreColumns(_parms, _foldColumn);
-        
-        _dinfo = new DataInfo(_train.clone(), _valid, 1, _parms._use_all_factor_levels 
-                || _parms._lambda_search, _parms._standardize ? 
-                DataInfo.TransformType.STANDARDIZE : DataInfo.TransformType.NONE, DataInfo.TransformType.NONE,
-                _parms.missingValuesHandling() == GLMParameters.MissingValuesHandling.Skip,
-                _parms.missingValuesHandling() == GLMParameters.MissingValuesHandling.MeanImputation 
-                        || _parms.missingValuesHandling() == GLMParameters.MissingValuesHandling.PlugValues,
-                _parms.makeImputer(), false, hasWeightCol(), hasOffsetCol(), hasFoldCol(),
-                _parms.interactionSpec());
+          _parms._fold_column  = _foldColumn;
+          _dinfo = new DataInfo(_train.clone(), _valid, 1, _parms._use_all_factor_levels
+                  || _parms._lambda_search, _parms._standardize ?
+                  DataInfo.TransformType.STANDARDIZE : DataInfo.TransformType.NONE, DataInfo.TransformType.NONE,
+                  _parms.missingValuesHandling() == GLMParameters.MissingValuesHandling.Skip,
+                  _parms.missingValuesHandling() == GLMParameters.MissingValuesHandling.MeanImputation
+                          || _parms.missingValuesHandling() == GLMParameters.MissingValuesHandling.PlugValues,
+                  _parms.makeImputer(), false, hasWeightCol(), hasOffsetCol(), hasFoldCol(),
+                  _parms.interactionSpec());
+//        }
+        if (_foldColumn != null)
+          _parms._fold_column = null;
         DKV.put(_dinfo._key, _dinfo);
         model = new GAMModel(dest(), _parms, new GAMModel.GAMModelOutput(GAM.this, _dinfo));
         model.write_lock(_job);
@@ -845,6 +856,8 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
               DKV.remove(newTFrame._key);
             }
             if (_cvOn) {
+              if (_foldColumn != null)
+                keep.add(_parms.train().vec(_foldColumn)._key);
               if (_parms._keep_cross_validation_predictions) {
                 keepFrameKeys(keep, model._output._cross_validation_holdout_predictions_frame_id);
                 for (int fInd = 0; fInd < _glmNFolds; fInd++)
@@ -905,12 +918,10 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
       if (_foldColumn == null) {
         glmParam._nfolds = _glmNFolds;
       } else {
+        glmParam._fold_column = _foldColumn;
         glmParam._nfolds = 0;
       }
-      glmParam._fold_column = _foldColumn;
       glmParam._fold_assignment = _foldAssignment;
-      if (_cvOn)
-        glmParam._ignored_columns = _origIgnoredColumns;
       return new GLM(glmParam, _penaltyMatCenter,  _gamColNamesCenter).trainModel().get();
     }
 
@@ -974,9 +985,6 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
       setParamField(parms, glmParam, true, field2, gamOnlyList);
       glmParam._train = trainData._key;
       glmParam._valid = valid==null?null:valid._key;
-      glmParam._nfolds = _glmNFolds; // will do cv in GLM and not in GAM
-      glmParam._fold_assignment = _foldAssignment;
-      glmParam._fold_column = _foldColumn;
       return glmParam;
     }
   }

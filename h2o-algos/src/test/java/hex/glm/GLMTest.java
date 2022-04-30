@@ -2,6 +2,8 @@ package hex.glm;
 
 import hex.*;
 import hex.DataInfo.TransformType;
+import hex.gam.GAM;
+import hex.gam.GAMModel;
 import hex.glm.GLMModel.GLMParameters.MissingValuesHandling;
 import hex.glm.GLMModel.GLMParameters;
 import hex.glm.GLMModel.GLMParameters.Family;
@@ -18,7 +20,9 @@ import water.H2O.H2OCountedCompleter;
 import water.fvec.*;
 import water.parser.BufferedString;
 import water.parser.ParseDataset;
+import water.rapids.ast.prims.advmath.AstKFold;
 import water.util.ArrayUtils;
+import water.util.RandomUtils;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -809,6 +813,71 @@ public class GLMTest  extends TestUtil {
       fr.delete();
       betaConstraints.delete();
       if (model != null) model.delete();
+    }
+  }
+
+  @Test
+  public void testCVFoldColumnBinomial() {
+    try {
+      Scope.enter();
+      Frame train = parseTestFile("smalldata/glm_test/binomial_20_cols_10KRows.csv");
+      int nfolds = 3;
+      Vec foldColumn = AstKFold.moduloKfoldColumn(train.anyVec().makeZero(), nfolds);
+      DKV.put(foldColumn);
+      Scope.track(foldColumn);
+      train.prepend("fold", foldColumn);
+      Random rnd = RandomUtils.getRNG(train.byteSize());
+      // change training data frame
+      int response_index = train.numCols() - 1;
+      String[] enumCnames = new String[]{"C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C21"};
+      int[] eCol = new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, response_index};
+      int count = 0;
+      for (String cname : enumCnames) {
+        train.replace((eCol[count]), train.vec(cname).toCategoricalVec()).remove();
+        count++;
+      }
+      Scope.track(train);
+      DKV.put(train);
+      double threshold = 0.5;
+      GLMModel.GLMParameters params = new GLMModel.GLMParameters();
+      params._family = GLMModel.GLMParameters.Family.binomial;
+      params._response_column = "C21";
+      params._max_iterations = 3;
+      params._train = train._key;
+      params._solver = GLMModel.GLMParameters.Solver.IRLSM;
+      params._fold_column = "fold";
+      params._keep_cross_validation_fold_assignment = true;
+      params._keep_cross_validation_models = true;
+      params._keep_cross_validation_predictions = true;
+      GLMModel glmCVModels = new GLM(params).trainModel().get();
+      Scope.track_generic(glmCVModels);
+
+      assertNotNull(glmCVModels._output._cross_validation_models);
+      assertNotNull(glmCVModels._output._cross_validation_metrics_summary);
+      assertEquals(nfolds, glmCVModels._output._cross_validation_models.length);
+
+      GLMModel[] cv_models = new GLMModel[nfolds];
+      Frame[] cvModelPreds = new Frame[nfolds];
+      Frame[] predFrames = new Frame[nfolds];
+      Frame fold_assignment_frame = Scope.track((Frame)DKV.getGet(glmCVModels._output._cross_validation_fold_assignment_frame_id));
+
+      // generate prediction from different cv models
+      for (int foldRun = 0; foldRun < nfolds; foldRun++) {
+        cv_models[foldRun] = DKV.getGet(glmCVModels._output._cross_validation_models[foldRun]);
+        Scope.track_generic(cv_models[foldRun]);
+        predFrames[foldRun] = Scope.track(cv_models[foldRun].score(train));
+        cvModelPreds[foldRun] = Scope.track((Frame) DKV.getGet(glmCVModels._output._cross_validation_predictions[foldRun]));
+      }
+      // compare cv predictions and fresh predictions from cv models and they better be EQUAL
+      for (int rind = 0; rind < train.numRows(); rind++) {
+        if (rnd.nextDouble() <= threshold) {
+          int foldNum = (int) fold_assignment_frame.vec(0).at(rind);
+          assert Math.abs(predFrames[foldNum].vec(2).at(rind) - cvModelPreds[foldNum].vec(2).at(rind)) < 1e-6
+                  : "Frame contents differ.";
+        }
+      }
+    } finally {
+      Scope.exit();
     }
   }
 

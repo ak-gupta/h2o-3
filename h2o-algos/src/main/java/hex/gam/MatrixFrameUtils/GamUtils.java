@@ -406,9 +406,19 @@ public class GamUtils {
     return polyBasisName.toString();
   }
 
-  public static Frame buildGamFrame(GAMParameters parms, Frame train, Key<Frame>[] gamFrameKeysCenter) {
+  public static Frame copyWithoutFold(Frame train, String foldColumn) {
+    Frame newFrame = new Frame();
+    String[] colNames = train.names();
+    for (String name : colNames) {
+      if (foldColumn != name)
+        newFrame.add(name, train.vec(name));
+    }
+    return newFrame;
+  }
+  
+  public static Frame buildGamFrame(GAMParameters parms, Frame train, Key<Frame>[] gamFrameKeysCenter, String foldColumn) {
     Vec responseVec = train.remove(parms._response_column);
-    
+    Vec foldVec = foldColumn==null?null:train.remove(foldColumn);
     List<String> ignored_cols = parms._ignored_columns == null?new ArrayList<>():Arrays.asList(parms._ignored_columns);
     Vec weightsVec = null;
     if (parms._weights_column != null) // move weight vector to be the last vector before response variable
@@ -419,6 +429,8 @@ public class GamUtils {
       if (ignored_cols.contains(parms._gam_columns_sorted[colIdx]))
         train.remove(parms._gam_columns_sorted[colIdx]);
     }
+    if (foldVec != null)
+      train.add(foldColumn, foldVec);
     if (weightsVec != null)
       train.add(parms._weights_column, weightsVec);
     if (responseVec != null)

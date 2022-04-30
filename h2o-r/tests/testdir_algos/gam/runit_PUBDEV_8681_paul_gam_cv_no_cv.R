@@ -47,6 +47,7 @@ test.model.gam <- function() {
     h2o.residual_deviance(object = mod2, train = TRUE)
     # [1] 76080.37
     pred2 <- h2o.predict(mod2, test)
+    browser()
     h2o.residual_analysis_plot(mod, test)
     h2o.residual_analysis_plot(mod2, test)
 }

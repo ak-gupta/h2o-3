@@ -256,6 +256,8 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
       } finally {
         _parms.read_unlock_frames(_job);
         if (!_parms._is_cv_model) cleanUp(); //cv calls cleanUp on its own terms
+        if (!_parms._is_cv_model && _parms._fold_column != null)
+          Scope.untrack(new Key[]{_parms.train().vec(_parms._fold_column)._key});
         Scope.exit();
       }
       tryComplete();
