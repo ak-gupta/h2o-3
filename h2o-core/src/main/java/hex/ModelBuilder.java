@@ -256,9 +256,12 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
       } finally {
         _parms.read_unlock_frames(_job);
         if (!_parms._is_cv_model) cleanUp(); //cv calls cleanUp on its own terms
-        if (!_parms._is_cv_model && _parms._fold_column != null)
+        if (!_parms._is_cv_model && _parms._fold_column != null) {
+          DKV.put(_parms.train().vec(_parms._fold_column));
           Scope.untrack(new Key[]{_parms.train().vec(_parms._fold_column)._key});
-        Scope.exit();
+        }
+        // I have put the fold column into DKV and make sure it is untracked but it does not work....
+        Scope.exit(); // _parms.train().vec(_parms._fold_column) is no longer available after this is executed
       }
       tryComplete();
     }

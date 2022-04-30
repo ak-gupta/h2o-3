@@ -140,6 +140,7 @@ public class GamCVTest extends TestUtil {
       GAMModel gam = new GAM(params).trainModel().get();
       Scope.track_generic(gam);
 
+      System.out.println(train.vec(0).at(0)); // this will cause an error.  Not sure why the fold column is deleted
       assertNotNull(gam._output._cross_validation_models);
       assertNotNull(gam._output._cross_validation_metrics_summary);
       assertEquals(nfolds, gam._output._cross_validation_models.length);

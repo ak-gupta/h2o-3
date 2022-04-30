@@ -856,8 +856,10 @@ public class GAM extends ModelBuilder<GAMModel, GAMModel.GAMParameters, GAMModel
               DKV.remove(newTFrame._key);
             }
             if (_cvOn) {
-              if (_foldColumn != null)
+              if (_foldColumn != null) {
+                DKV.put(_parms.train().vec(_foldColumn));
                 keep.add(_parms.train().vec(_foldColumn)._key);
+              }
               if (_parms._keep_cross_validation_predictions) {
                 keepFrameKeys(keep, model._output._cross_validation_holdout_predictions_frame_id);
                 for (int fInd = 0; fInd < _glmNFolds; fInd++)
