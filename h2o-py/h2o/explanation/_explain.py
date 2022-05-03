@@ -2670,7 +2670,7 @@ def _pretty_metric_name(metric):
         mean_per_class_error="Mean Per Class Error",
         mean_residual_deviance="Mean Residual Deviance",
         mse="Mean Square Error",
-        predict_time_per_row_ms="Prediction Time [ms]",
+        predict_time_per_row_ms="Per-Row Prediction Time [ms]",
         rmse="Root Mean Square Error",
         rmsle="Root Mean Square Log Error",
         training_time_ms="Training Time [ms]"
@@ -2915,14 +2915,14 @@ def _get_leaderboard(
     else:
         METRICS = [
             "AUC",
-            "mean_residual_deviance",
+            "RMSE",
             "mean_per_class_error",
             "logloss",
             "pr_auc",
-            "RMSE",
             "MSE",
             "mae",
             "rmsle",
+            "mean_residual_deviance",
         ]
         import math
         from collections import defaultdict
@@ -2940,7 +2940,7 @@ def _get_leaderboard(
                     predictions.append(model.predict(frame[row_index, :]))
                 result["algo"].append(model.algo)
             for metric in METRICS:
-                if not any(result[metric.lower()]) or not all([not math.isnan(float(m)) for m in result[metric.lower()]]):
+                if not any(result[metric.lower()]) or not all([m is not None and not math.isnan(float(m)) for m in result[metric.lower()]]):
                     del result[metric.lower()]
             leaderboard = h2o.H2OFrame(result)[["model_id"] + [m.lower()
                                                                for m in METRICS
@@ -2956,6 +2956,8 @@ def _get_leaderboard(
                 "auc" if task.lower() == "binomial" else \
                 "logloss" if task.lower() == "multinomial" else \
                 "mean_residual_deviance"
+            if sort_metric not in leaderboard.columns:
+                sort_metric = leaderboard.columns[1]
             return leaderboard.sort(sort_metric).head(rows=min(top_n, leaderboard.nrow))
 
 
